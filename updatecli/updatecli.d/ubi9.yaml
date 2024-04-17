@@ -1,0 +1,97 @@
+---
+name: Bump ubi9  version
+
+scms:
+  default:
+    kind: github
+    spec:
+      user: "{{ .github.user }}"
+      email: "{{ .github.email }}"
+      owner: "{{ .github.owner }}"
+      repository: "{{ .github.repository }}"
+      token: "{{ requiredEnv .github.token }}"
+      username: "{{ .github.username }}"
+      branch: "{{ .github.branch }}"
+
+sources:
+  Ubi9LatestVersion:
+    kind: dockerimage
+    name: "Get the latest ubi9 Linux version"
+    transformers:
+      - trimprefix: "-"
+    spec:
+      image: "redhat/ubi9"
+      tagfilter: "-*"
+      versionfilter:
+        kind: regex
+        pattern: >-
+          ^9\.\d-\d{4}$
+
+conditions:
+  testDockerfileArgJDK17:
+    name: "Does the Dockerfile have an ARG instruction for the ubi9 Linux version?"
+    kind: dockerfile
+    disablesourceinput: true
+    spec:
+      file: 17/rhel/ubi9/hotspot/Dockerfile
+      instruction:
+        keyword: "ARG"
+        matcher: "UBI9_TAG"
+  testDockerfileArgJDK21:
+    name: "Does the Dockerfile have an ARG instruction for the ubi9 Linux version?"
+    kind: dockerfile
+    disablesourceinput: true
+    spec:
+      file: 21/rhel/ubi9/hotspot/Dockerfile
+      instruction:
+        keyword: "ARG"
+        matcher: "UBI9_TAG"
+  testVersionInBakeFile:
+    name: "Does the bake file have variable UBI9_TAG"
+    kind: file
+    disablesourceinput: true
+    spec:
+      file: docker-bake.hcl
+      matchpattern: "(.*UBI9_TAG.*)"
+
+targets:
+  updateDockerfileJDK17:
+    name: "Update the value of the base image (ARG UBI9_TAG) in the Dockerfile"
+    kind: dockerfile
+    sourceid: Ubi9LatestVersion
+    spec:
+      file: 17/rhel/ubi9/hotspot/Dockerfile
+      instruction:
+        keyword: "ARG"
+        matcher: "UBI9_TAG"
+    scmid: default
+  updateDockerfileJDK21:
+    name: "Update the value of the base image (ARG UBI9_TAG) in the Dockerfile"
+    kind: dockerfile
+    sourceid: Ubi9LatestVersion
+    spec:
+      file: 21/rhel/ubi9/hotspot/Dockerfile
+      instruction:
+        keyword: "ARG"
+        matcher: "UBI9_TAG"
+    scmid: default
+  updateDockerBake:
+    name: "Update the value of the base image (ARG UBI9_TAG) in the docker-bake.hcl"
+    kind: file
+    sourceid: Ubi9LatestVersion
+    spec:
+      file: docker-bake.hcl
+      matchpattern: >-
+        variable(.*)"UBI9_TAG"(.*){(.*)(\r\n|\r|\n)(.*)default(.*)=(.*)
+      replacepattern: >-
+        variable${1}"UBI9_TAG"${2}{${3}${4}${5}default${6}= "{{ source "Ubi9LatestVersion" }}"
+    scmid: default
+actions:
+  default:
+    kind: github/pullrequest
+    scmid: default
+    title: Bump ubi9 Linux Version to {{ source "Ubi9LatestVersion" }}
+    spec:
+      labels:
+        - dependencies
+        - ubi9
