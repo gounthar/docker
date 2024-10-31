@@ -1,20 +1,42 @@
-ARG BOOKWORM_TAG=20240408
-ARG JAVA_VERSION=17.0.10_7
-FROM eclipse-temurin:"${JAVA_VERSION}"-jdk-jammy as jre-build
+ARG BOOKWORM_TAG=20241016
+
+FROM debian:bookworm-"${BOOKWORM_TAG}" as jre-build
+
+ARG JAVA_VERSION=17.0.13_11
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+COPY jdk-download-url.sh /usr/bin/jdk-download-url.sh
+COPY jdk-download.sh /usr/bin/jdk-download.sh
+
+RUN apt-get update \
+  && apt-get install --no-install-recommends -y \
+    ca-certificates \
+    curl \
+    jq \
+  && rm -rf /var/lib/apt/lists/* \
+  && /usr/bin/jdk-download.sh
+
+ENV PATH="/opt/jdk-${JAVA_VERSION}/bin:${PATH}"
 
 # Generate smaller java runtime without unneeded files
 # for now we include the full module path to maintain compatibility
 # while still saving space (approx 200mb from the full distribution)
-# Arguments to jlink are specific to Java 17 jlink
-RUN jlink \
-        --add-modules ALL-MODULE-PATH \
-        --strip-java-debug-attributes \
-        --no-man-pages \
-        --no-header-files \
-        --compress=2 \
-        --output /javaruntime
+RUN case "$(jlink --version 2>&1)" in \
+      "17."*) set -- "--compress=2" ;; \
+      # the compression argument is different for JDK21
+      "21."*) set -- "--compress=zip-6" ;; \
+      *) echo "ERROR: unmanaged jlink version pattern" && exit 1 ;; \
+    esac; \
+    jlink \
+      --strip-java-debug-attributes \
+      "$1" \
+      --add-modules ALL-MODULE-PATH \
+      --no-man-pages \
+      --no-header-files \
+      --output /javaruntime
 
-FROM debian:bookworm-"${BOOKWORM_TAG}"
+FROM debian:bookworm-"${BOOKWORM_TAG}" AS controller
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -40,7 +62,7 @@ RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.d
   && rm -rf /var/lib/apt/lists/* \
   && git lfs install
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 ARG TARGETARCH
 ARG COMMIT_SHA
@@ -54,9 +76,9 @@ ARG agent_port=50000
 ARG JENKINS_HOME=/var/jenkins_home
 ARG REF=/usr/share/jenkins/ref
 
-ENV JENKINS_HOME $JENKINS_HOME
-ENV JENKINS_SLAVE_AGENT_PORT ${agent_port}
-ENV REF $REF
+ENV JENKINS_HOME=$JENKINS_HOME
+ENV JENKINS_SLAVE_AGENT_PORT=${agent_port}
+ENV REF=$REF
 
 # Jenkins is run with user `jenkins`, uid = 1000
 # If you bind mount a volume from the host or a data container,
@@ -77,10 +99,10 @@ RUN mkdir -p ${REF}/init.groovy.d
 
 # jenkins version being bundled in this docker image
 ARG JENKINS_VERSION
-ENV JENKINS_VERSION ${JENKINS_VERSION:-2.442}
+ENV JENKINS_VERSION=${JENKINS_VERSION:-2.479}
 
 # jenkins.war checksum, download will be validated using it
-ARG JENKINS_SHA=b4f596923eb37b93c3f5a21a6a32fc3bedd57d04a1b63186811c0ce8b3d9f07c
+ARG JENKINS_SHA=910ea36cef37c45087e39d65e335988e036fccea47c79cc5a52e721a10cb1b49
 
 # Can be used to customize where jenkins.war get downloaded from
 ARG JENKINS_URL=https://repo.jenkins-ci.org/public/org/jenkins-ci/main/jenkins-war/${JENKINS_VERSION}/jenkins-war-${JENKINS_VERSION}.war
@@ -92,14 +114,17 @@ RUN curl -fsSL ${JENKINS_URL} -o /usr/share/jenkins/jenkins.war \
   && sha256sum -c --strict /tmp/jenkins_sha \
   && rm -f /tmp/jenkins_sha
 
-ENV JENKINS_UC https://updates.jenkins.io
+ENV JENKINS_UC=https://updates.jenkins.io
 ENV JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
 ENV JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
 RUN chown -R ${user} "$JENKINS_HOME" "$REF"
 
-ARG PLUGIN_CLI_VERSION=2.12.15
+ARG PLUGIN_CLI_VERSION=2.13.2
 ARG PLUGIN_CLI_URL=https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/${PLUGIN_CLI_VERSION}/jenkins-plugin-manager-${PLUGIN_CLI_VERSION}.jar
-RUN curl -fsSL ${PLUGIN_CLI_URL} -o /opt/jenkins-plugin-manager.jar
+RUN curl -fsSL ${PLUGIN_CLI_URL} -o /opt/jenkins-plugin-manager.jar \
+  && echo "$(curl -fsSL "${PLUGIN_CLI_URL}.sha256")  /opt/jenkins-plugin-manager.jar" >/tmp/jenkins_sha \
+  && sha256sum -c --strict /tmp/jenkins_sha \
+  && rm -f /tmp/jenkins_sha
 
 # for main web interface:
 EXPOSE ${http_port}
@@ -107,10 +132,10 @@ EXPOSE ${http_port}
 # will be used by attached agents:
 EXPOSE ${agent_port}
 
-ENV COPY_REFERENCE_FILE_LOG $JENKINS_HOME/copy_reference_file.log
+ENV COPY_REFERENCE_FILE_LOG=$JENKINS_HOME/copy_reference_file.log
 
 ENV JAVA_HOME=/opt/java/openjdk
-ENV PATH "${JAVA_HOME}/bin:${PATH}"
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 COPY --from=jre-build /javaruntime $JAVA_HOME
 
 USER ${user}
