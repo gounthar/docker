@@ -163,7 +163,7 @@ target "alpine_jdk21" {
     tag_lts(false, "lts-alpine-jdk21"),
     tag_lts(true, "lts-alpine"),
   ]
-  platforms = ["linux/amd64", "linux/arm64"]
+  platforms = ["linux/amd64", "linux/arm64", "linux/riscv64"]
 }
 
 target "debian_jdk17" {
