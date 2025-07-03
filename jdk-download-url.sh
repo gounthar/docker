@@ -28,6 +28,12 @@ elif [ -z "$OS" ]; then
     fi
 fi
 
+# Check if JAVA_VERSION looks like a full version string (e.g., 21.0.7_6 or 21.0.7+6)
+if ! echo "$JAVA_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(_[0-9]+|\+[0-9]+)$'; then
+    echo "Error: JAVA_VERSION must be a full version string (e.g., 21.0.7_6 or 21.0.7+6), not just the major version. You provided: '$JAVA_VERSION'" >&2
+    exit 1
+fi
+
 # Check if ARCHS is set. If it's not set, assign the current architecture to it
 if [ -z "$ARCHS" ]; then
     ARCHS=$(uname -m | sed -e 's/x86_64/x64/' -e 's/armv7l/arm/')
