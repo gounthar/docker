@@ -1,0 +1,14 @@
+graph TD
+    source#lastTemurin21VersionTransformed(["Get the latest Adoptium JDK21 version via the API with '+' replaced by '_' (temurin)"])
+    source#lastTemurin21VersionTransformed --> target#setJDK21VersionDockerBake
+    target#setJDK21VersionDockerBake("Bump JDK21 version for Linux images in the docker-bake.hcl file (hcl)")
+    source#lastTemurin21VersionTransformed --> target#setJDK21VersionWindowsDockerCompose
+    target#setJDK21VersionWindowsDockerCompose("Bump JDK21 version in build-windows.yaml (yaml)")
+    condition#checkTemurinAllReleases{"Check if the :#quot;<lastTemurin21Version>:#quot; is available for all platforms (temurin)"}
+    condition#checkTemurinAllReleases --> target#setJDK21VersionDockerBake
+    condition#checkTemurinAllReleases --> target#setJDK21VersionWindowsDockerCompose
+    source#lastTemurin21Version(["Get the latest Adoptium JDK21 version via the API (temurin)"])
+    source#lastTemurin21Version --> target#setJDK21VersionDockerBake
+    source#lastTemurin21Version --> target#setJDK21VersionWindowsDockerCompose
+    source#lastTemurin21Version --> condition#checkTemurinAllReleases
+
