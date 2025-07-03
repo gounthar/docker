@@ -102,7 +102,7 @@ variable "JAVA21_VERSION" {
 }
 
 variable "JAVA25_VERSION" {
-  default = "25-ea+29"
+  default = "25+29-ea-beta"
 }
 
 variable "BOOKWORM_TAG" {
