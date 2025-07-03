@@ -28,9 +28,11 @@ elif [ -z "$OS" ]; then
     fi
 fi
 
-# Check if JAVA_VERSION looks like a full version string (e.g., 21.0.7_6 or 21.0.7+6)
-if ! echo "$JAVA_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(_[0-9]+|\+[0-9]+)$'; then
-    echo "Error: JAVA_VERSION must be a full version string (e.g., 21.0.7_6 or 21.0.7+6), not just the major version. You provided: '$JAVA_VERSION'" >&2
+# Check if JAVA_VERSION looks like a valid Adoptium version string:
+# - LTS/GA: 21.0.7_6, 21.0.7+6, 17.0.15_6, etc.
+# - EA: 25-ea+29, 25-ea+5, etc.
+if ! echo "$JAVA_VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){0,2}(-ea)?(\+|_)[0-9]+$'; then
+    echo "Error: JAVA_VERSION must be a valid Adoptium version string (e.g., 21.0.7_6, 21.0.7+6, 25-ea+29). You provided: '$JAVA_VERSION'" >&2
     exit 1
 fi
 
