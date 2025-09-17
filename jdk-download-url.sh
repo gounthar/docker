@@ -51,14 +51,6 @@ else
     IFS=$OLD_IFS
 fi
 
-# Early exit for unsupported riscv64 architecture
-for ARCH in $ARCHS; do
-    if [ "$ARCH" = "riscv64" ]; then
-        echo "Error: JDK for riscv64 is not available from Adoptium. Please provide a custom JDK or check for updates." >&2
-        exit 1
-    fi
-done
-
 # Check if jq and curl are installed
 # If they are not installed, exit the script with an error message
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
