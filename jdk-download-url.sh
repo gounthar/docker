@@ -28,6 +28,14 @@ elif [ -z "$OS" ]; then
     fi
 fi
 
+# Check if JAVA_VERSION looks like a valid Adoptium version string:
+# - LTS/GA: 21.0.7_6, 21.0.7+6, 17.0.15_6, etc.
+# - EA: 25-ea+29, 25-ea+5, etc.
+if ! echo "$JAVA_VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){0,2}(-ea)?(\+|_)[0-9]+$'; then
+    echo "Error: JAVA_VERSION must be a valid Adoptium version string (e.g., 21.0.7_6, 21.0.7+6, 25-ea+29). You provided: '$JAVA_VERSION'" >&2
+    exit 1
+fi
+
 # Check if ARCHS is set. If it's not set, assign the current architecture to it
 if [ -z "$ARCHS" ]; then
     ARCHS=$(uname -m | sed -e 's/x86_64/x64/' -e 's/armv7l/arm/')
@@ -70,7 +78,34 @@ FIRST_ARCH_URL=""
 
 # Loop over the array of architectures
 for ARCH in $ARCHS; do
-    # Fetch the download URL from the Adoptium API
+    # Special handling for JDK25 EA (Adoptium API does not support /v3/binary/version for these)
+    if echo "$JAVA_VERSION" | grep -Eq '^25(-ea)?(\+|_)[0-9]+$'; then
+        # Use the assets endpoint to find the correct download URL
+        ASSETS_JSON=$(curl -fs "https://api.adoptium.net/v3/assets/feature_releases/25/ea?architecture=${ARCH}&os=${OS_TYPE}&image_type=jdk")
+        # Try to extract the download link for the matching build
+        # Accept both jq and grep/sed/awk fallback
+        if command -v jq >/dev/null 2>&1; then
+            # Try to match build number from JAVA_VERSION
+            BUILD_NUM=$(echo "$JAVA_VERSION" | sed -E 's/^25(-ea)?[+_]//')
+            URL=$(echo "$ASSETS_JSON" | jq -r ".[] | select(.version_data.build == ${BUILD_NUM}) | .binaries[0].package.link")
+        else
+            # Fallback: crude grep/awk for the first .package.link
+            URL=$(echo "$ASSETS_JSON" | grep -o '"link":"[^"]*"' | head -n1 | cut -d'"' -f4)
+        fi
+
+        if [ -z "$URL" ]; then
+            echo "Error: Could not find a matching JDK25 EA binary for build ${BUILD_NUM} (arch: ${ARCH}, os: ${OS_TYPE})" >&2
+            exit 1
+        fi
+
+        # If FIRST_ARCH_URL is empty, store the current URL
+        if [ -z "$FIRST_ARCH_URL" ]; then
+            FIRST_ARCH_URL=$URL
+        fi
+        continue
+    fi
+
+    # Default: Fetch the download URL from the Adoptium API
     URL="https://api.adoptium.net/v3/binary/version/jdk-${ENCODED_ARCHIVE_DIRECTORY}/${OS_TYPE}/${ARCH}/jdk/hotspot/normal/eclipse?project=jdk"
 
     if ! RESPONSE=$(curl -fsI "$URL"); then
