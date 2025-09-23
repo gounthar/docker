@@ -37,6 +37,7 @@ group "linux-s390x" {
     "debian_jdk17",
     "debian_jdk21",
     "debian_jdk25",
+    "debian_slim_jdk25",
   ]
 }
 
@@ -45,6 +46,7 @@ group "linux-ppc64le" {
     "debian_jdk17",
     "debian_jdk21",
     "debian_jdk25",
+    "debian_slim_jdk25",
     "rhel_ubi9_jdk17",
     "rhel_ubi9_jdk21",
     "rhel_ubi9_jdk25",
@@ -106,7 +108,7 @@ variable "JAVA21_VERSION" {
 }
 
 variable "JAVA25_VERSION" {
-  default = "25-ea+36"
+  default = "25+9-ea-beta"
 }
 
 variable "BOOKWORM_TAG" {
@@ -389,6 +391,69 @@ target "rhel_ubi9_jdk21" {
     tag_lts(true, "lts-rhel-ubi9-jdk21")
   ]
   platforms = ["linux/amd64", "linux/arm64", "linux/ppc64le"]
+}
+
+target "alpine_jdk25" {
+  dockerfile = "alpine/hotspot/Dockerfile"
+  context    = "."
+  args = {
+    JENKINS_VERSION    = JENKINS_VERSION
+    WAR_SHA            = WAR_SHA
+    WAR_URL            = war_url()
+    COMMIT_SHA         = COMMIT_SHA
+    PLUGIN_CLI_VERSION = PLUGIN_CLI_VERSION
+    ALPINE_TAG         = ALPINE_FULL_TAG
+    JAVA_VERSION       = JAVA25_VERSION
+  }
+  tags = [
+    tag(true, "alpine-jdk25"),
+    tag_weekly(false, "alpine-jdk25"),
+    tag_weekly(false, "alpine${ALPINE_SHORT_TAG}-jdk25"),
+    tag_lts(false, "lts-alpine-jdk25"),
+  ]
+  platforms = ["linux/amd64", "linux/arm64"]
+}
+
+target "debian_jdk25" {
+  dockerfile = "debian/bookworm/hotspot/Dockerfile"
+  context    = "."
+  args = {
+    JENKINS_VERSION    = JENKINS_VERSION
+    WAR_SHA            = WAR_SHA
+    WAR_URL            = war_url()
+    COMMIT_SHA         = COMMIT_SHA
+    PLUGIN_CLI_VERSION = PLUGIN_CLI_VERSION
+    BOOKWORM_TAG       = BOOKWORM_TAG
+    JAVA_VERSION       = JAVA25_VERSION
+  }
+  tags = [
+    tag(true, "jdk25"),
+    tag_weekly(false, "latest-jdk25"),
+    tag_weekly(false, "jdk25"),
+    tag_lts(false, "lts-jdk25"),
+    tag_lts(true, "lts-jdk25")
+  ]
+  platforms = ["linux/amd64", "linux/arm64", "linux/s390x", "linux/ppc64le"]
+}
+
+target "debian_slim_jdk25" {
+  dockerfile = "debian/bookworm-slim/hotspot/Dockerfile"
+  context    = "."
+  args = {
+    JENKINS_VERSION    = JENKINS_VERSION
+    WAR_SHA            = WAR_SHA
+    WAR_URL            = war_url()
+    COMMIT_SHA         = COMMIT_SHA
+    PLUGIN_CLI_VERSION = PLUGIN_CLI_VERSION
+    BOOKWORM_TAG       = BOOKWORM_TAG
+    JAVA_VERSION       = JAVA25_VERSION
+  }
+  tags = [
+    tag(true, "slim-jdk25"),
+    tag_weekly(false, "slim-jdk25"),
+    tag_lts(false, "lts-slim-jdk25"),
+  ]
+  platforms = ["linux/amd64", "linux/arm64", "linux/s390x", "linux/ppc64le"]
 }
 
 target "rhel_ubi9_jdk25" {
